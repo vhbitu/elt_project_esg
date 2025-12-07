@@ -146,6 +146,8 @@ resource "google_cloud_run_service" "ingestion" {
       # Por enquanto, vamos deixar o Cloud Run usar a service account padrão.
       # No próximo passo vamos trocar por uma SA dedicada.
       # service_account_name = google_service_account.run_sa.email
+      service_account_name = google_service_account.run_sa.email
+
     }
   }
 
@@ -159,4 +161,31 @@ resource "google_cloud_run_service" "ingestion" {
     google_artifact_registry_repository.docker_repo,
     google_bigquery_dataset.raw
   ]
+}
+
+# Service Account dedicada para o Cloud Run (ingestão)
+resource "google_service_account" "run_sa" {
+  account_id   = "cloud-run-ingest-sa-${var.env}"
+  display_name = "SA do Cloud Run Ingestion (${var.env})"
+}
+
+# Permissão para escrever no bucket GCS
+resource "google_project_iam_member" "run_sa_storage" {
+  project = var.project_id
+  role    = "roles/storage.objectAdmin"
+  member  = "serviceAccount:${google_service_account.run_sa.email}"
+}
+
+# Permissão para inserir/atualizar dados no BigQuery
+resource "google_project_iam_member" "run_sa_bigquery" {
+  project = var.project_id
+  role    = "roles/bigquery.dataEditor"
+  member  = "serviceAccount:${google_service_account.run_sa.email}"
+}
+
+# Permissão para consumir Pub/Sub
+resource "google_project_iam_member" "run_sa_pubsub_subscriber" {
+  project = var.project_id
+  role    = "roles/pubsub.subscriber"
+  member  = "serviceAccount:${google_service_account.run_sa.email}"
 }
