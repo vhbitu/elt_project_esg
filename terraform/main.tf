@@ -53,6 +53,12 @@ resource "google_project_service" "storage" {
   disable_on_destroy = false
 }
 
+resource "google_project_service" "artifactregistry" {
+  project            = var.project_id
+  service            = "artifactregistry.googleapis.com"
+  disable_on_destroy = false
+}
+
 # Configuração do Bucket GCS para dados brutos
 
 resource "google_storage_bucket" "raw_data" {
@@ -102,5 +108,18 @@ resource "google_pubsub_topic" "ingestion_trigger" {
 
   depends_on = [
     google_project_service.pubsub
+  ]
+}
+
+# Artifact Registry - Docker Hub GCP
+
+resource "google_artifact_registry_repository" "docker_repo" {
+  project       = var.project_id
+  location      = var.region
+  repository_id = "ingestion-repo-${var.env}" # ex.: ingestion-repo-dev
+  format        = "DOCKER"
+
+  depends_on = [
+    google_project_service.artifactregistry
   ]
 }
