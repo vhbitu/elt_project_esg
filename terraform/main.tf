@@ -59,6 +59,12 @@ resource "google_project_service" "artifactregistry" {
   disable_on_destroy = false
 }
 
+resource "google_project_service" "eventarc" {
+  project            = var.project_id
+  service            = "eventarc.googleapis.com"
+  disable_on_destroy = false
+}
+
 # Configuração do Bucket GCS para dados brutos
 
 resource "google_storage_bucket" "raw_data" {
@@ -188,4 +194,48 @@ resource "google_project_iam_member" "run_sa_pubsub_subscriber" {
   project = var.project_id
   role    = "roles/pubsub.subscriber"
   member  = "serviceAccount:${google_service_account.run_sa.email}"
+}
+
+#Permissão para SA invocar Cloud Run
+resource "google_project_iam_member" "run_sa_run_invoker" {
+  project = var.project_id
+  role    = "roles/run.invoker"
+  member  = "serviceAccount:${google_service_account.run_sa.email}"
+}
+
+# Eventarc: trigger Pub/Sub -> Cloud Run
+resource "google_eventarc_trigger" "ingest_trigger" {
+  name     = "trigger-ingestion-${var.env}"
+  location = var.region
+  project  = var.project_id
+
+  transport {
+    pubsub {
+      topic = google_pubsub_topic.ingestion_trigger.id
+    }
+  }
+
+  destination {
+    cloud_run_service {
+      service = google_cloud_run_service.ingestion.name
+      region  = var.region
+      path    = "/" # endpoint do Cloud Run (pode ajustar depois)
+    }
+  }
+
+  matching_criteria {
+    attribute = "type"
+    value     = "google.cloud.pubsub.topic.v1.messagePublished"
+  }
+
+  # SA usada pelo Eventarc pra invocar o Cloud Run
+  service_account = google_service_account.run_sa.email
+
+  depends_on = [
+    google_project_service.eventarc,
+    google_pubsub_topic.ingestion_trigger,
+    google_cloud_run_service.ingestion,
+    google_project_iam_member.run_sa_run_invoker
+  ]
+
 }
