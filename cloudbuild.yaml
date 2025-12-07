@@ -1,3 +1,6 @@
+options:
+  logging: CLOUD_LOGGING_ONLY
+
 steps:
   - id: "hello-ci"
     name: "gcr.io/cloud-builders/gcloud"
@@ -5,5 +8,5 @@ steps:
     args:
       - "-c"
       - |
-        echo "Build do Cloud Build rodando"
+        echo "Build do Cloud Build rodando 🎯"
         echo "Branch: $BRANCH_NAME"
