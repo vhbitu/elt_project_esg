@@ -123,3 +123,40 @@ resource "google_artifact_registry_repository" "docker_repo" {
     google_project_service.artifactregistry
   ]
 }
+
+
+# Cloud Run: serviço de ingestão
+resource "google_cloud_run_service" "ingestion" {
+  name     = "ingestion-service-${var.env}"
+  location = var.region
+  project  = var.project_id
+
+  template {
+    spec {
+      containers {
+        image = var.container_image
+
+        # Exemplo de variável de ambiente: dataset RAW que a app vai usar
+        env {
+          name  = "BQ_RAW_DATASET"
+          value = "${var.env}_raw"
+        }
+      }
+
+      # Por enquanto, vamos deixar o Cloud Run usar a service account padrão.
+      # No próximo passo vamos trocar por uma SA dedicada.
+      # service_account_name = google_service_account.run_sa.email
+    }
+  }
+
+  traffic {
+    percent         = 100
+    latest_revision = true
+  }
+
+  depends_on = [
+    google_project_service.run,
+    google_artifact_registry_repository.docker_repo,
+    google_bigquery_dataset.raw
+  ]
+}
