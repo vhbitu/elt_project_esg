@@ -21,3 +21,17 @@ terraform {
     google = {
       source  = "hashicorp/google"
       version = "~> 5.0"
+```
+
+## Cloud Scheduler (dev)
+
+Job criado manualmente:
+
+gcloud scheduler jobs create pubsub ingest-job-dev \
+  --location="southamerica-east1" \
+  --schedule="0 7 * * 1" \
+  --topic="ingestion-trigger-dev" \
+  --message-body="Start ingestion" \
+  --time-zone="America/Sao_Paulo"
+
+(Em Construção)
