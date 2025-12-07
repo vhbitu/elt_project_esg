@@ -93,3 +93,14 @@ resource "google_bigquery_dataset" "staging" {
     google_project_service.bigquery
   ]
 }
+
+# Pub/Sub: tópico para disparar ingestão
+
+resource "google_pubsub_topic" "ingestion_trigger" {
+  name    = "ingestion-trigger-${var.env}"
+  project = var.project_id
+
+  depends_on = [
+    google_project_service.pubsub
+  ]
+}
