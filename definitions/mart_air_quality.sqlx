@@ -14,7 +14,7 @@ config {
 with raw as (
   select
     ingested_at,
-    payload
+    raw_payload
   from ${ref("stg_api_raw")}
 ),
 
