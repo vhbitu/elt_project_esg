@@ -1,0 +1,16 @@
+config {
+  type: "table",
+  schema: "dev_staging",
+  tags: ["staging"]
+}
+
+/*
+  Modelo de staging básico:
+  - Lê a tabela raw do BigQuery
+  - Mantém as colunas principais
+*/
+
+select
+  ingested_at,
+  payload as raw_payload
+from `elt-project-esg.dev_raw.air_pollution_raw`;

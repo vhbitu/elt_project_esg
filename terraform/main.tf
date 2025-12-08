@@ -106,6 +106,33 @@ resource "google_bigquery_dataset" "staging" {
   ]
 }
 
+# BigQuery: dataset de mart (camada curada)
+resource "google_bigquery_dataset" "mart" {
+  dataset_id = "${var.env}_mart"
+  project    = var.project_id
+  location   = var.region
+
+  delete_contents_on_destroy = var.env == "dev" ? true : false
+
+  depends_on = [
+    google_project_service.bigquery
+  ]
+}
+
+# BigQuery: dataset para assertions do Dataform
+resource "google_bigquery_dataset" "assertions" {
+  dataset_id = "${var.env}_assertions"
+  project    = var.project_id
+  location   = var.region
+
+  delete_contents_on_destroy = var.env == "dev" ? true : false
+
+  depends_on = [
+    google_project_service.bigquery
+  ]
+}
+
+
 # Pub/Sub: tópico para disparar ingestão
 
 resource "google_pubsub_topic" "ingestion_trigger" {
