@@ -1,0 +1,60 @@
+config {
+  type: "table",
+  schema: "dev_mart",
+  tags: ["mart"]
+}
+
+/*
+  Mart de qualidade do ar (OpenWeather):
+  - Lê o JSON da stg_api_raw
+  - Explode o array list[]
+  - Extrai coordenadas, timestamp, AQI e componentes (poluentes)
+*/
+
+with raw as (
+  select
+    ingested_at,
+    payload
+  from ${ref("stg_api_raw")}
+),
+
+expanded as (
+  select
+    ingested_at,
+
+    -- Coordenadas
+    cast(JSON_VALUE(payload, '$.coord.lat') as float64) as coord_lat,
+    cast(JSON_VALUE(payload, '$.coord.lon') as float64) as coord_lon,
+
+    -- Cada item da lista de medições
+    cast(JSON_VALUE(item, '$.dt') as int64)    as measure_dt_unix,
+    cast(JSON_VALUE(item, '$.main.aqi') as int64) as aqi,
+
+    -- Componentes (poluentes)
+    cast(JSON_VALUE(item, '$.components.co')    as float64) as co,
+    cast(JSON_VALUE(item, '$.components.no')    as float64) as no,
+    cast(JSON_VALUE(item, '$.components.no2')   as float64) as no2,
+    cast(JSON_VALUE(item, '$.components.o3')    as float64) as o3,
+    cast(JSON_VALUE(item, '$.components.so2')   as float64) as so2,
+    cast(JSON_VALUE(item, '$.components.pm10')  as float64) as pm10,
+    cast(JSON_VALUE(item, '$.components.pm2_5') as float64) as pm2_5
+
+  from raw,
+  unnest(JSON_QUERY_ARRAY(payload, '$.list')) as item
+)
+
+select
+  ingested_at,
+  timestamp_seconds(measure_dt_unix) as measure_ts,
+  date(timestamp_seconds(measure_dt_unix)) as measure_date,
+  coord_lat,
+  coord_lon,
+  aqi,
+  co,
+  no,
+  no2,
+  o3,
+  so2,
+  pm10,
+  pm2_5
+from expanded;
