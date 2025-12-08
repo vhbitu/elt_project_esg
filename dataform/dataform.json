@@ -1,0 +1,14 @@
+{
+  "warehouse": "bigquery",
+  "defaultDatabase": "elt-project-esg",
+  "defaultLocation": "southamerica-east1",
+
+  "defaultSchema": "dev_staging",
+  "assertionSchema": "dev_assertions",
+
+  "dataformCoreVersion": "3.0.0",
+
+  "vars": {
+    "env": "dev"
+  }
+}
