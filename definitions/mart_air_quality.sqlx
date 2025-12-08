@@ -32,7 +32,7 @@ expanded as (
 
     -- Componentes (poluentes)
     cast(JSON_VALUE(item, '$.components.co')    as float64) as co,
-    cast(JSON_VALUE(item, '$.components.no')    as float64) as no,
+    cast(JSON_VALUE(item, '$.components.no')    as float64) as no_value,
     cast(JSON_VALUE(item, '$.components.no2')   as float64) as no2,
     cast(JSON_VALUE(item, '$.components.o3')    as float64) as o3,
     cast(JSON_VALUE(item, '$.components.so2')   as float64) as so2,
@@ -51,7 +51,7 @@ select
   coord_lon,
   aqi,
   co,
-  no,
+  no_value,
   no2,
   o3,
   so2,
