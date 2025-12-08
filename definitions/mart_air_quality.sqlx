@@ -57,4 +57,4 @@ select
   so2,
   pm10,
   pm2_5
-from expanded;
+from expanded

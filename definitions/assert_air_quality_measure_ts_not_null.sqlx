@@ -12,4 +12,4 @@ config {
 select
   *
 from ${ref("mart_air_quality")}
-where measure_ts is null;
+where measure_ts is null
