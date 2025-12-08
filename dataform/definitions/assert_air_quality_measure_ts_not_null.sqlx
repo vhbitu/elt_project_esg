@@ -1,0 +1,15 @@
+config {
+  type: "assertion",
+  schema: "dev_assertions",
+  tags: ["assertion", "mart", "air_quality"]
+}
+
+/*
+  Falha se existir qualquer linha no mart_air_quality
+  com measure_ts nulo.
+*/
+
+select
+  *
+from ${ref("mart_air_quality")}
+where measure_ts is null;
