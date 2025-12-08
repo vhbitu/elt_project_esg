@@ -12,5 +12,5 @@ config {
 
 select
   ingested_at,
-  data as raw_payload
+  payload as raw_payload
 from `elt-project-esg.dev_raw.air_pollution_raw`;
