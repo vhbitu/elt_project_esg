@@ -1,0 +1,9 @@
+defaultProject: elt-project-esg
+defaultLocation: southamerica-east1
+dataformCoreVersion: 3.0.0
+
+defaultDataset: dev_staging
+defaultAssertionDataset: dev_assertions
+
+vars:
+  env: dev
