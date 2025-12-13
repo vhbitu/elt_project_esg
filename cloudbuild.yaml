@@ -2,11 +2,44 @@ options:
   logging: CLOUD_LOGGING_ONLY
 
 steps:
-  - id: "hello-ci"
+  - id: "run-dataform-dev"
     name: "gcr.io/cloud-builders/gcloud"
     entrypoint: "bash"
     args:
       - "-c"
       - |
-        echo "Build do Cloud Build rodando"
-        echo "Branch: $BRANCH_NAME"
+        set -e
+
+        echo "Rodando Dataform (dev) via API..."
+        TOKEN="$(gcloud auth print-access-token)"
+
+        COMPILATION_URI="https://dataform.googleapis.com/v1beta1/projects/elt-project-esg/locations/southamerica-east1/repositories/esg_dataform/compilationResults"
+        WORKFLOW_URI="https://dataform.googleapis.com/v1beta1/projects/elt-project-esg/locations/southamerica-east1/repositories/esg_dataform/workflowInvocations"
+
+        COMPILATION_JSON=$(curl -sS -X POST "$COMPILATION_URI" \
+          -H "Authorization: Bearer ${TOKEN}" \
+          -H "Content-Type: application/json" \
+          -d '{
+            "gitCommitish": "dev",
+            "codeCompilationConfig": {
+              "defaultDatabase": "elt-project-esg",
+              "defaultSchema": "dev_staging",
+              "assertionSchema": "dev_assertions",
+              "vars": { "env": "dev" }
+            }
+          }')
+
+        COMPILATION_NAME=$(echo "$COMPILATION_JSON" | sed -n 's/.*"name": *"\([^"]*\)".*/\1/p')
+        echo "CompilationResult: $COMPILATION_NAME"
+
+        curl -sS -X POST "$WORKFLOW_URI" \
+          -H "Authorization: Bearer ${TOKEN}" \
+          -H "Content-Type: application/json" \
+          -d "{
+            \"compilationResult\": \"${COMPILATION_NAME}\",
+            \"invocationConfig\": {
+              \"serviceAccount\": \"projects/-/serviceAccounts/sa-dataform-dev@elt-project-esg.iam.gserviceaccount.com\"
+            }
+          }"
+
+        echo "Dataform disparado."
