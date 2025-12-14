@@ -1,0 +1,30 @@
+﻿{
+    "name":  "projects/elt-project-esg/locations/southamerica-east1/repositories/esg_dataform/workflowConfigs/workflow_dev_daily",
+    "releaseConfig":  "projects/elt-project-esg/locations/southamerica-east1/repositories/esg_dataform/releaseConfigs/rc_dev",
+    "invocationConfig":  {
+                             "includedTargets":  [
+                                                     {
+                                                         "database":  "elt-project-esg",
+                                                         "schema":  "dev_assertions",
+                                                         "name":  "assert_air_quality_measure_ts_not_null"
+                                                     },
+                                                     {
+                                                         "database":  "elt-project-esg",
+                                                         "schema":  "dev_mart",
+                                                         "name":  "mart_air_quality"
+                                                     },
+                                                     {
+                                                         "database":  "elt-project-esg",
+                                                         "schema":  "dev_staging",
+                                                         "name":  "stg_api_raw"
+                                                     }
+                                                 ],
+                             "serviceAccount":  "sa-dataform-dev@elt-project-esg.iam.gserviceaccount.com",
+                             "queryPriority":  "INTERACTIVE"
+                         },
+    "cronSchedule":  "15 10 * * *",
+    "timeZone":  "Etc/UTC",
+    "createTime":  "2025-12-14T11:45:46.596084942Z",
+    "updateTime":  "2025-12-14T12:15:16.023226917Z",
+    "internalMetadata":  "{\"authentication\":{\"authServiceAccountName\":\"service-225338347852@gcp-sa-dataform.iam.gserviceaccount.com\"},\"db_metadata_insert_time\":\"2025-12-14T11:45:46.661192Z\",\"db_metadata_update_time\":\"2025-12-14T12:15:15.986561Z\",\"unique_ccfe_id\":\"b8ee555f-13da-4cca-9c0a-bbb5c06f4512\"}"
+}
