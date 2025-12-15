@@ -14,9 +14,19 @@ provider "google" {
   region  = var.region
 }
 
+data "google_project" "this" {
+  project_id = var.project_id
+}
+
 # Abaixo complementarei com os resources (bucket, datasets, etc.)
 
 #Ativação das APIs
+
+resource "google_project_service" "secretmanager" {
+  project            = var.project_id
+  service            = "secretmanager.googleapis.com"
+  disable_on_destroy = false
+}
 resource "google_project_service" "run" {
   project            = var.project_id
   service            = "run.googleapis.com"
@@ -87,7 +97,7 @@ resource "google_bigquery_dataset" "raw" {
   location   = var.region
 
   # Em dev é comum recriar
-  delete_contents_on_destroy = true
+  delete_contents_on_destroy = var.env == "dev" ? true : false
 
   depends_on = [
     google_project_service.bigquery
@@ -157,12 +167,38 @@ resource "google_artifact_registry_repository" "docker_repo" {
   ]
 }
 
+resource "google_secret_manager_secret" "air_api_key" {
+  project   = var.project_id
+  secret_id = "air-pollution-api-key-${var.env}"
+
+  replication {
+    auto {}
+  }
+
+  depends_on = [google_project_service.secretmanager]
+}
+
+resource "google_secret_manager_secret_iam_member" "run_sa_secret_accessor" {
+  project   = var.project_id
+  secret_id = google_secret_manager_secret.air_api_key.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.run_sa.email}"
+}
+
+
 
 # Cloud Run: serviço de ingestão
 resource "google_cloud_run_service" "ingestion" {
   name     = "ingestion-service-${var.env}"
   location = var.region
   project  = var.project_id
+
+  lifecycle {
+    ignore_changes = [
+      template[0].spec[0].containers[0].image
+    ]
+  }
+
 
   template {
     spec {
@@ -171,11 +207,43 @@ resource "google_cloud_run_service" "ingestion" {
 
         # Exemplo de variável de ambiente: dataset RAW que a app vai usar
         env {
-          name  = "BQ_RAW_DATASET"
-          value = "${var.env}_raw"
+          name = "ENV"
+          value = var.env
+          }
+        env {
+          name = "RAW_BUCKET"
+          value = google_storage_bucket.raw_data.name
+          }
+        env {
+          name = "BIGQUERY_DATASET"
+          value = google_bigquery_dataset.raw.dataset_id
+          }
+        env {
+          name = "BIGQUERY_TABLE"
+          value = "air_pollution_raw"
+          }
+        env {
+          name = "AIR_LAT"
+          value = "-23.5505"
+          }
+        env {
+          name = "AIR_LON"
+          value = "-46.6333"
+          }
+        env {
+          name = "GCP_PROJECT"
+          value = var.project_id
+        }
+        env {
+          name = "AIR_POLLUTION_API_KEY"
+          value_from {
+            secret_key_ref {
+              name = "air-pollution-api-key-${var.env}"
+              key  = "latest"
+            }
+          }
         }
       }
-
       # Por enquanto, vamos deixar o Cloud Run usar a service account padrão.
       # No próximo passo vamos trocar por uma SA dedicada.
       # service_account_name = google_service_account.run_sa.email
@@ -265,4 +333,45 @@ resource "google_eventarc_trigger" "ingest_trigger" {
     google_project_iam_member.run_sa_run_invoker
   ]
 
+}
+
+
+resource "google_pubsub_topic_iam_member" "cloudscheduler_publisher" {
+  project = var.project_id
+  topic   = google_pubsub_topic.ingestion_trigger.name
+  role    = "roles/pubsub.publisher"
+  member  = "serviceAccount:service-${data.google_project.this.number}@gcp-sa-cloudscheduler.iam.gserviceaccount.com"
+
+  depends_on = [
+    google_project_service.cloudscheduler,
+    google_pubsub_topic.ingestion_trigger
+  ]
+}
+
+# API: Cloud Scheduler
+resource "google_project_service" "cloudscheduler" {
+  project            = var.project_id
+  service            = "cloudscheduler.googleapis.com"
+  disable_on_destroy = false
+}
+
+# Cloud Scheduler: dispara ingestão todo dia 07:00
+resource "google_cloud_scheduler_job" "ingest_job" {
+  name      = "ingest-job-${var.env}"
+  project   = var.project_id
+  region    = var.region
+  schedule  = "0 7 * * *"
+  time_zone = "America/Sao_Paulo"
+
+  attempt_deadline = "0s"
+
+  pubsub_target {
+    topic_name = google_pubsub_topic.ingestion_trigger.id
+    data       = base64encode("Start ingestion")
+  }
+
+  depends_on = [
+    google_project_service.cloudscheduler,
+    google_pubsub_topic.ingestion_trigger
+  ]
 }

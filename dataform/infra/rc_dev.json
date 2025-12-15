@@ -1,0 +1,14 @@
+﻿{
+    "name":  "projects/elt-project-esg/locations/southamerica-east1/repositories/esg_dataform/releaseConfigs/rc_dev",
+    "gitCommitish":  "dev",
+    "codeCompilationConfig":  {
+                                  "defaultDatabase":  "elt-project-esg",
+                                  "defaultSchema":  "dev_staging",
+                                  "assertionSchema":  "dev_assertions",
+                                  "vars":  {
+                                               "env":  "dev"
+                                           }
+                              },
+    "releaseCompilationResult":  "projects/elt-project-esg/locations/southamerica-east1/repositories/esg_dataform/compilationResults/5cc59200-52a7-4ef6-829a-86c259b9f212",
+    "internalMetadata":  "{\"authentication\":{\"authServiceAccountName\":\"service-225338347852@gcp-sa-dataform.iam.gserviceaccount.com\"},\"db_metadata_insert_time\":\"2025-12-13T19:14:09.303067Z\",\"db_metadata_update_time\":\"2025-12-14T13:35:05.790094Z\",\"unique_ccfe_id\":\"9b404b0e-ad50-4613-a50a-2a4aecd4d3c1\"}"
+}
