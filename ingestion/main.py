@@ -3,6 +3,7 @@ import json
 import base64
 import time
 from datetime import datetime, timezone
+import concurrent.futures
 
 from flask import Flask, request
 import requests
@@ -37,6 +38,9 @@ LON = float(os.environ.get("AIR_LON", "-46.6333"))
 storage_client = storage.Client()
 bq_client = bigquery.Client()
 
+# Reutilizar sessão HTTP para evitar handshake SSL repetido
+session = requests.Session()
+
 API_URL = "https://api.openweathermap.org/data/2.5/air_pollution"
 
 
@@ -51,9 +55,50 @@ def fetch_air_pollution():
         "appid": AIR_POLLUTION_API_KEY,
     }
 
-    resp = requests.get(API_URL, params=params, timeout=10)
+    # Usando session.get para conexão persistente
+    resp = session.get(API_URL, params=params, timeout=10)
     resp.raise_for_status()
     return resp.json()
+
+
+def upload_to_gcs(api_data):
+    """Salva JSON bruto no GCS."""
+    if not BUCKET_NAME:
+        raise RuntimeError("RAW_BUCKET não configurado")
+
+    bucket = storage_client.bucket(BUCKET_NAME)
+    blob_name = f"air_pollution/{ENV}/{int(time.time())}.json"
+    blob = bucket.blob(blob_name)
+    blob.upload_from_string(
+        json.dumps(api_data),
+        content_type="application/json",
+    )
+    print(f"[INGEST] Dados salvos no GCS: gs://{BUCKET_NAME}/{blob_name}")
+    return True
+
+
+def insert_into_bigquery(api_data):
+    """Insere registro no BigQuery."""
+    if not PROJECT_ID:
+        print("[INGEST] PROJECT_ID não definido, pulando insert no BigQuery")
+        return True
+
+    table_id = f"{PROJECT_ID}.{DATASET}.{TABLE}"
+    row = {
+        "lat": LAT,
+        "lon": LON,
+        "payload": json.dumps(api_data),
+        "ingested_at": datetime.now(timezone.utc).isoformat(),
+    }
+    print(f"[INGEST] Tentando inserir no BigQuery: {table_id}")
+    errors = bq_client.insert_rows_json(table_id, [row])
+    if errors:
+        print("[INGEST] BigQuery insert errors (RAW):")
+        print(errors)
+        raise RuntimeError("Ingestion partial failure (BigQuery)")
+
+    print(f"[INGEST] Registro inserido no BigQuery: {table_id}")
+    return True
 
 
 @app.route("/", methods=["POST"])
@@ -78,38 +123,21 @@ def ingest():
         api_data = fetch_air_pollution()
         print("[INGEST] Air Pollution API response received")
 
-        # 3) Salvar JSON bruto no GCS
-        if not BUCKET_NAME:
-            raise RuntimeError("RAW_BUCKET não configurado")
+        # 3) Paralelizar Upload GCS e Insert BigQuery
+        # Como são operações I/O bound, ThreadPoolExecutor é adequado
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+            future_gcs = executor.submit(upload_to_gcs, api_data)
+            future_bq = executor.submit(insert_into_bigquery, api_data)
 
-        bucket = storage_client.bucket(BUCKET_NAME)
-        blob_name = f"air_pollution/{ENV}/{int(time.time())}.json"
-        blob = bucket.blob(blob_name)
-        blob.upload_from_string(
-            json.dumps(api_data),
-            content_type="application/json",
-        )
-        print(f"[INGEST] Dados salvos no GCS: gs://{BUCKET_NAME}/{blob_name}")
+            # Aguardar ambos terminarem e verificar exceções
+            # Se um falhar, o outro ainda completa, mas vamos reportar erro 500
+            done, not_done = concurrent.futures.wait(
+                [future_gcs, future_bq],
+                return_when=concurrent.futures.ALL_COMPLETED
+            )
 
-        # 4) Inserir registro no BigQuery
-        if PROJECT_ID:
-            table_id = f"{PROJECT_ID}.{DATASET}.{TABLE}"
-            row = {
-                "lat": LAT,
-                "lon": LON,
-                "payload": json.dumps(api_data),
-                "ingested_at": datetime.now(timezone.utc).isoformat(),
-            }
-            print(f"[INGEST] Tentando inserir no BigQuery: {table_id}")
-            errors = bq_client.insert_rows_json(table_id, [row])
-            if errors:
-                print("[INGEST] BigQuery insert errors (RAW):")
-                print(errors)
-                return "Ingestion partial failure (BigQuery)", 500
-            print(f"[INGEST] Registro inserido no BigQuery: {table_id}")
-
-        else:
-            print("[INGEST] PROJECT_ID não definido, pulando insert no BigQuery")
+            for future in done:
+                future.result() # Isso levantará exceção se ocorreu dentro da thread
 
         return "Ingestion success", 200
 
